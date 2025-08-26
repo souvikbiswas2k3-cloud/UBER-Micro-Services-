@@ -1,5 +1,5 @@
 const userModel = require('../models/user.models');
-const blacklisttokenModel = require('../models/blacklisttoken.models');
+const blackListTokenModel = require('../models/blacklisttoken.models');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
@@ -63,34 +63,15 @@ module.exports.login = async (req, res) => {
 
 }
 
-module.exports.logout = async (req, res) => {
-    try {
-        console.log('🔍 req.cookies:', req.cookies);
-        console.log('🔍 req.headers.authorization:', req.headers['authorization']);
+module.exports.logout = async (req, res, next) => {
+    res.clearCookie('token');
+    const token = req.cookies.token || req.headers.authorization.split(' ')[ 1 ];
 
-        const cookieToken = req.cookies?.token;
-        const headerToken = req.headers['authorization']?.startsWith('Bearer ')
-            ? req.headers['authorization'].split(' ')[1]
-            : null;
+    await blackListTokenModel.create({ token });
 
-        const token = cookieToken || headerToken;
+    res.status(200).json({ message: 'Logged out' });
 
-        if (!token) {
-            return res.status(400).json({ message: 'No token found in cookies or Authorization header.' });
-        }
-
-        console.log('🪙 Token being blacklisted:', token);
-
-        await blacklisttokenModel.create({ token });
-
-        res.clearCookie('token');
-        res.json({ message: 'User logged out successfully' });
-
-    } catch (error) {
-        console.error('❌ Logout error:', error);
-        res.status(500).json({ message: error.message });
-    }
-};
+}
 
 
 module.exports.profile = async (req, res) => {
