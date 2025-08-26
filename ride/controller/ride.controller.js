@@ -1,5 +1,5 @@
 const rideModel = require('../models/ride.models');
-// const { subscribeToQueue, publishToQueue } = require('../service/rabbit')
+const { subscribeToQueue, publishToQueue } = require('../services/rabbit');
 
 module.exports.createRide = async (req, res, next) => {
 

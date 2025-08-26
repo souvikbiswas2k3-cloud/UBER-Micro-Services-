@@ -2,7 +2,9 @@ const captainModel = require('../models/captain.models');
 const blacklisttokenModel = require('../models/blacklisttoken.models');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { subscribeToQueue } = require('../services/rabbit')
 
+const pendingRequests = [];
 
 module.exports.register = async (req, res) => {
     try {
@@ -63,14 +65,15 @@ module.exports.login = async (req, res) => {
 
 }
 
-module.exports.logout = async (req, res, next) => {
-    res.clearCookie('token');
-    const token = req.cookies.token || req.headers.authorization.split(' ')[ 1 ];
-
-    await blackListTokenModel.create({ token });
-
-    res.status(200).json({ message: 'Logged out' });
-
+module.exports.logout = async (req, res) => {
+    try {
+        const token = req.cookies.token;
+        await blacklisttokenModel.create({ token });
+        res.clearCookie('token');
+        res.send({ message: 'captain logged out successfully' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
 }
 
 module.exports.profile = async (req, res) => {
@@ -93,3 +96,25 @@ module.exports.toggleAvailability = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 }
+
+module.exports.waitForNewRide = async (req, res) => {
+    // Set timeout for long polling (e.g., 30 seconds)
+    req.setTimeout(30000, () => {
+        res.status(204).end(); // No Content
+    });
+
+    // Add the response object to the pendingRequests array
+    pendingRequests.push(res);
+};
+
+subscribeToQueue("new-ride", (data) => {
+    const rideData = JSON.parse(data);
+
+    // Send the new ride data to all pending requests
+    pendingRequests.forEach(res => {
+        res.json(rideData);
+    });
+
+    // Clear the pending requests
+    pendingRequests.length = 0;
+});
